@@ -1,0 +1,588 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GP-EMS | Hệ thống Quản lý Bảo trì Thiết bị</title>
+    <link rel="icon" href="https://gpems.net/logo-icon.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar { transition: margin-left 0.3s ease-in-out, transform 0.3s ease-in-out; }
+        .main-content { transition: margin-left 0.3s ease-in-out; }
+        .sidebar-collapsed { margin-left: -16rem; }
+        .main-content-expanded { margin-left: 0; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card-hover:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+        .modal { display: none; }
+        .modal.show { display: flex; }
+        .device-image-sm { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; }
+        .device-image-lg { width: 120px; height: 120px; object-fit: cover; border-radius: 12px; }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px;}
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-600">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+            <div class="text-center mb-8">
+                <img src="https://gpems.net/logo-icon.png" alt="Logo" class="w-16 h-16 mx-auto mb-4">
+                <h1 class="text-2xl font-bold text-slate-800">Hệ thống Quản lý Bảo trì</h1>
+                <p class="text-slate-600 mt-2">Đăng nhập để tiếp tục</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Tên đăng nhập</label>
+                    <input type="text" id="username" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Nhập tên đăng nhập" required>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Mật khẩu</label>
+                    <input type="password" id="password" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Nhập mật khẩu" required>
+                </div>
+                
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold">
+                    Đăng nhập
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center text-sm text-slate-500">
+                Demo: admin/admin hoặc user/user
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="hidden">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar fixed left-0 top-0 h-full w-64 bg-slate-800 text-slate-300 z-40 flex flex-col">
+            <div class="p-4 border-b border-slate-700">
+                <div class="flex items-center space-x-3">
+                    <img src="https://gpems.net/logo-icon.png" alt="Logo" class="w-10 h-10">
+                    <div>
+                        <h2 class="font-bold text-white text-lg">GP-EMS</h2>
+                        <p class="text-sm text-slate-400" id="userRole">Admin</p>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <a href="#" onclick="showSection('dashboard', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg transition bg-slate-700 text-white">
+                    <i class="fas fa-chart-pie w-5"></i><span>Dashboard</span>
+                </a>
+                <h3 class="px-3 pt-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Quản lý</h3>
+                <a href="#" onclick="showSection('devices', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-desktop w-5"></i><span>Thiết bị</span>
+                </a>
+                <a href="#" onclick="showSection('maintenance', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-wrench w-5"></i><span>Bảo trì</span>
+                </a>
+                 <a href="#" onclick="showSection('incidents', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-exclamation-triangle w-5"></i><span>Sự cố</span>
+                </a>
+                <a href="#" onclick="showSection('schedules', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-calendar-alt w-5"></i><span>Kế hoạch</span>
+                </a>
+                 <a href="#" onclick="showSection('logs', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-clipboard-list w-5"></i><span>Nhật ký</span>
+                </a>
+
+                <h3 class="px-3 pt-4 pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Hệ thống</h3>
+                 <a href="#" onclick="showSection('users', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-users w-5"></i><span>Người dùng</span>
+                </a>
+                <a href="#" onclick="showSection('masterData', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-database w-5"></i><span>Master Data</span>
+                </a>
+                 <a href="#" onclick="showSection('permissions', this)" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 hover:text-white transition">
+                    <i class="fas fa-user-shield w-5"></i><span>Phân quyền</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-slate-700">
+                <a href="#" onclick="logout()" class="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-red-500 hover:text-white transition">
+                    <i class="fas fa-sign-out-alt w-5"></i><span>Đăng xuất</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" class="main-content lg:ml-64 min-h-screen">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-slate-200 p-4 sticky top-0 z-30">
+                <div class="flex items-center justify-between">
+                    <!-- Left Side: Menu Toggle & Title -->
+                    <div class="flex items-center">
+                        <button id="menuToggleBtn" class="text-slate-600 hover:text-blue-600 p-2 rounded-full">
+                            <i class="fas fa-bars text-xl"></i>
+                        </button>
+                        <h1 id="pageTitle" class="text-2xl font-bold text-slate-800 ml-4">Dashboard</h1>
+                    </div>
+                    
+                    <!-- Middle: Dynamic Actions -->
+                    <div id="headerActions" class="hidden md:flex items-center space-x-4 w-full max-w-xl">
+                        <div class="relative w-full">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i class="fas fa-search text-slate-400"></i>
+                            </span>
+                            <input id="headerSearchInput" type="text" class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Tìm kiếm...">
+                        </div>
+                        <button id="headerAddButton" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold whitespace-nowrap">
+                           <i class="fas fa-plus mr-2"></i>Thêm
+                        </button>
+                    </div>
+
+                    <!-- Right Side: Notifications & User -->
+                    <div class="flex items-center space-x-5">
+                        <div class="relative" id="notificationDropdownContainer">
+                            <button onclick="toggleDropdown('notificationDropdown')" class="text-slate-500 hover:text-blue-600">
+                                <i class="fas fa-bell text-xl"></i>
+                                <span class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">4</span>
+                            </button>
+                             <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden">
+                                <!-- Notifications content -->
+                            </div>
+                        </div>
+
+                        <div class="relative" id="userDropdownContainer">
+                           <button onclick="toggleDropdown('userDropdown')" class="flex items-center space-x-2">
+                                <img class="w-9 h-9 rounded-full border-2 border-slate-200" src="https://i.pravatar.cc/150?u=admin" alt="User avatar">
+                                <span class="hidden md:block text-sm font-medium text-slate-700" id="currentUser"></span>
+                                <i class="hidden md:block fas fa-chevron-down text-xs text-slate-500"></i>
+                            </button>
+                             <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden">
+                                <!-- User menu content -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ### SECTIONS START HERE ### -->
+            <main class="p-6">
+                <!-- Dashboard Section -->
+                <div id="dashboardSection" class="section fade-in">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                         <div class="bg-white p-6 rounded-xl shadow-md card-hover"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Tổng thiết bị</p><p class="text-3xl font-bold text-slate-800" id="totalDevices">0</p></div><div class="bg-blue-100 p-4 rounded-full"><i class="fas fa-desktop text-xl text-blue-600"></i></div></div></div>
+                         <div class="bg-white p-6 rounded-xl shadow-md card-hover"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Cần bảo trì</p><p class="text-3xl font-bold text-orange-500" id="needMaintenance">0</p></div><div class="bg-orange-100 p-4 rounded-full"><i class="fas fa-wrench text-xl text-orange-500"></i></div></div></div>
+                        <div class="bg-white p-6 rounded-xl shadow-md card-hover"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Sự cố tồn đọng</p><p class="text-3xl font-bold text-red-500" id="totalIncidents">0</p></div><div class="bg-red-100 p-4 rounded-full"><i class="fas fa-exclamation-triangle text-xl text-red-500"></i></div></div></div>
+                         <div class="bg-white p-6 rounded-xl shadow-md card-hover"><div class="flex items-center justify-between"><div><p class="text-sm text-slate-500">Hoàn thành tháng</p><p class="text-3xl font-bold text-green-500">89%</p></div><div class="bg-green-100 p-4 rounded-full"><i class="fas fa-check-circle text-xl text-green-500"></i></div></div></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-md lg:col-span-3"><h3 class="text-lg font-semibold mb-4 text-slate-800">Trạng thái Công việc</h3><div class="relative h-80"><canvas id="maintenanceChart"></canvas></div></div>
+                        <div class="bg-white p-6 rounded-xl shadow-md lg:col-span-2"><h3 class="text-lg font-semibold mb-4 text-slate-800">Nhiệm vụ Gần đây</h3><div id="recentTasks" class="space-y-4"></div></div>
+                    </div>
+                </div>
+
+                <!-- Devices Section -->
+                <div id="devicesSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                    <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Thiết bị</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Loại</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Vị trí</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Trạng thái</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Bảo trì cuối</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="devicesTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+
+                <!-- Maintenance Section -->
+                <div id="maintenanceSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                     <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">ID</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Thiết bị</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Loại bảo trì</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Ngày kế hoạch</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Kỹ thuật viên</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Trạng thái</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="maintenanceTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+
+                <!-- Incidents Section -->
+                <div id="incidentsSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                     <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">ID</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Thiết bị</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Tiêu đề</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Mức độ</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Trạng thái</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Người báo cáo</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="incidentsTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+
+                <!-- Schedules Section -->
+                <div id="schedulesSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                     <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">ID</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Tên kế hoạch</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Tần suất</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Lần chạy kế tiếp</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Trạng thái</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="schedulesTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+                
+                <!-- Logs Section -->
+                <div id="logsSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                     <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">ID</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Hành động</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Người thực hiện</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Thời gian</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Chi tiết</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="logsTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+                
+                <!-- Users Section -->
+                <div id="usersSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                     <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Người dùng</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Vai trò</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Ngày tham gia</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Trạng thái</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="usersTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+
+                <!-- Master Data Section -->
+                <div id="masterDataSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                     <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Loại dữ liệu</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Mã</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Tên</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Trạng thái</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="masterDataTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+
+                <!-- Permissions Section -->
+                <div id="permissionsSection" class="section hidden fade-in bg-white rounded-xl shadow-md overflow-hidden">
+                     <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-slate-50"><tr>
+                        <th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Vai trò</th><th class="px-6 py-3 text-left font-semibold text-slate-600 uppercase">Module</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Xem</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thêm</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Sửa</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Xóa</th><th class="px-6 py-3 text-center font-semibold text-slate-600 uppercase">Thao tác</th>
+                    </tr></thead><tbody id="permissionsTableBody" class="divide-y divide-slate-200"></tbody></table></div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="editDeviceModal" class="modal fixed inset-0 bg-black bg-opacity-60 z-50 items-center justify-center p-4">
+        <!-- Edit Device Modal Content -->
+    </div>
+
+    <script>
+    // #############################
+    // ### GLOBAL STATE & CONFIG ###
+    // #############################
+    let currentUser = null;
+    const state = {
+        devices: [], maintenanceTasks: [], incidents: [], schedules: [], logs: [], users: [], masterData: [], permissions: []
+    };
+    const statusConfig = {
+        active: { text: 'Hoạt động', color: 'bg-green-100 text-green-700' },
+        inactive: { text: 'Ngưng hoạt động', color: 'bg-slate-200 text-slate-700'},
+        maintenance: { text: 'Bảo trì', color: 'bg-yellow-100 text-yellow-700' },
+        broken: { text: 'Hỏng', color: 'bg-red-100 text-red-700' },
+        scheduled: { text: 'Đã lên lịch', color: 'bg-blue-100 text-blue-700' },
+        in_progress: { text: 'Đang thực hiện', color: 'bg-indigo-100 text-indigo-700' },
+        completed: { text: 'Hoàn thành', color: 'bg-green-100 text-green-700' },
+        new: { text: 'Mới', color: 'bg-cyan-100 text-cyan-700' },
+        processing: { text: 'Đang xử lý', color: 'bg-orange-100 text-orange-700' },
+        resolved: { text: 'Đã giải quyết', color: 'bg-green-100 text-green-700' },
+    };
+    const sectionConfig = {
+        dashboard: { showActions: false },
+        devices: { showActions: true, placeholder: 'Tìm kiếm thiết bị...', addButtonText: 'Thêm Thiết bị' },
+        maintenance: { showActions: true, placeholder: 'Tìm kiếm bảo trì...', addButtonText: 'Thêm Lệnh Bảo trì' },
+        incidents: { showActions: true, placeholder: 'Tìm kiếm sự cố...', addButtonText: 'Báo cáo Sự cố' },
+        schedules: { showActions: true, placeholder: 'Tìm kiếm kế hoạch...', addButtonText: 'Thêm Kế hoạch' },
+        logs: { showActions: true, placeholder: 'Tìm kiếm nhật ký...', addButtonText: 'Xuất Báo cáo' },
+        users: { showActions: true, placeholder: 'Tìm kiếm người dùng...', addButtonText: 'Thêm Người dùng' },
+        masterData: { showActions: true, placeholder: 'Tìm kiếm master data...', addButtonText: 'Thêm Dữ liệu' },
+        permissions: { showActions: true, placeholder: 'Tìm kiếm vai trò...', addButtonText: 'Lưu Phân quyền' },
+    };
+    
+    // #############################
+    // ### DATA INITIALIZATION ###
+    // #############################
+    function initializeSampleData() {
+        state.devices = [
+            { id: 'PC-001', name: 'Dell OptiPlex 7090', type: 'computer', location: 'Phòng IT-01', status: 'active', lastMaintenance: '2024-03-15', image: 'https://placehold.co/400x400/3B82F6/white?text=PC-001', manualUrl: '#' },
+            { id: 'HP-001', name: 'HP LaserJet Pro M404dn', type: 'printer', location: 'Phòng Admin', status: 'maintenance', lastMaintenance: '2024-03-10', image: 'https://placehold.co/400x400/F59E0B/white?text=HP-001', manualUrl: '#' },
+            { id: 'SV-002', name: 'Dell PowerEdge R740', type: 'server', location: 'Phòng Server', status: 'broken', lastMaintenance: '2024-01-12', image: 'https://placehold.co/400x400/8B5CF6/white?text=SV-002', manualUrl: '#' },
+            { id: 'SW-01', name: 'Cisco Catalyst 9200', type: 'network', location: 'Tủ rack A2', status: 'active', lastMaintenance: '2023-12-20', image: 'https://placehold.co/400x400/10B981/white?text=SW-01', manualUrl: '#' }
+        ];
+        state.maintenanceTasks = [
+            { id: 'MT-001', deviceId: 'PC-001', type: 'Định kỳ', scheduledDate: '2024-05-20', technician: 'Nguyễn Văn A', status: 'completed' },
+            { id: 'MT-002', deviceId: 'HP-001', type: 'Sửa chữa', scheduledDate: '2024-05-18', technician: 'Trần Thị B', status: 'in_progress' },
+            { id: 'MT-003', deviceId: 'SV-002', type: 'Nâng cấp', scheduledDate: '2024-05-25', technician: 'Lê Văn C', status: 'scheduled' },
+            { id: 'MT-004', deviceId: 'SW-01', type: 'Kiểm tra', scheduledDate: '2024-06-01', technician: 'Nguyễn Văn A', status: 'scheduled' }
+        ];
+        state.incidents = [
+            { id: 'INC-001', deviceId: 'SV-002', title: 'Server không phản hồi', severity: 'critical', status: 'processing', reporter: 'Nguyễn Thị D' },
+            { id: 'INC-002', deviceId: 'HP-001', title: 'Máy in bị kẹt giấy', severity: 'medium', status: 'resolved', reporter: 'Trần Văn E' },
+            { id: 'INC-003', deviceId: 'PC-001', title: 'Màn hình xanh (BSOD)', severity: 'high', status: 'new', reporter: 'Phạm Thị F' },
+            { id: 'INC-004', deviceId: 'SW-01', title: 'Mất kết nối port 5', severity: 'low', status: 'resolved', reporter: 'Lê Văn C' },
+        ];
+        state.schedules = [
+            { id: 'SCH-01', name: 'Bảo trì máy chủ hàng tuần', frequency: 'Hàng tuần', nextRun: '2024-06-07', status: 'active' },
+            { id: 'SCH-02', name: 'Kiểm tra máy in hàng tháng', frequency: 'Hàng tháng', nextRun: '2024-06-30', status: 'active' },
+            { id: 'SCH-03', name: 'Sao lưu dữ liệu hàng ngày', frequency: 'Hàng ngày', nextRun: '2024-06-01', status: 'active' },
+            { id: 'SCH-04', name: 'Bảo trì hệ thống mạng hàng quý', frequency: 'Hàng quý', nextRun: '2024-07-15', status: 'inactive' }
+        ];
+        state.logs = [
+            { id: 'LOG-001', action: 'Tạo người dùng mới', user: 'admin', time: '2024-05-31 09:15:22', details: 'Tạo user: "tranvanb"' },
+            { id: 'LOG-002', action: 'Cập nhật trạng thái sự cố', user: 'levanc', time: '2024-05-31 09:10:05', details: 'Sự cố INC-002 -> Đã giải quyết' },
+            { id: 'LOG-003', action: 'Đăng nhập thất bại', user: 'unknown', time: '2024-05-31 08:55:10', details: 'IP: 192.168.1.100' },
+            { id: 'LOG-004', action: 'Xóa thiết bị', user: 'admin', time: '2024-05-30 17:30:00', details: 'Xóa thiết bị: PC-OLD-05' },
+        ];
+        state.users = [
+            { id: 'U-001', avatar: 'https://i.pravatar.cc/150?u=U-001', name: 'Nguyễn Văn A', email: 'nguyenvana@gpems.net', role: 'Admin', joined: '2022-01-10', status: 'active' },
+            { id: 'U-002', avatar: 'https://i.pravatar.cc/150?u=U-002', name: 'Trần Thị B', email: 'tranthib@gpems.net', role: 'Kỹ thuật viên', joined: '2022-03-15', status: 'active' },
+            { id: 'U-003', avatar: 'https://i.pravatar.cc/150?u=U-003', name: 'Lê Văn C', email: 'levanc@gpems.net', role: 'Kỹ thuật viên', joined: '2023-05-20', status: 'active' },
+            { id: 'U-004', avatar: 'https://i.pravatar.cc/150?u=U-004', name: 'Phạm Thị D', email: 'phamthid@gpems.net', role: 'Người dùng', joined: '2024-02-01', status: 'inactive' },
+        ];
+        state.masterData = [
+            { id: 'MD-01', type: 'Loại Thiết Bị', code: 'computer', name: 'Máy tính', status: 'active' },
+            { id: 'MD-02', type: 'Trạng Thái Sự Cố', code: 'new', name: 'Mới', status: 'active' },
+            { id: 'MD-03', type: 'Vị trí', code: 'PHONG-IT', name: 'Phòng IT', status: 'inactive' },
+            { id: 'MD-04', type: 'Nhà sản xuất', code: 'DELL', name: 'Dell Inc.', status: 'active' },
+        ];
+        state.permissions = [
+            { role: 'Admin', module: 'Thiết bị', view: true, add: true, edit: true, delete: true },
+            { role: 'Kỹ thuật viên', module: 'Thiết bị', view: true, add: false, edit: true, delete: false },
+            { role: 'Người dùng', module: 'Thiết bị', view: true, add: false, edit: false, delete: false },
+            { role: 'Admin', module: 'Người dùng', view: true, add: true, edit: true, delete: true },
+        ];
+    }
+    
+    // #############################
+    // ### CORE APP LOGIC ###
+    // #############################
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            if ((username === 'admin' && password === 'admin') || (username === 'user' && password === 'user')) {
+                currentUser = { username, role: username === 'admin' ? 'Admin' : 'User' };
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                document.getElementById('userRole').textContent = currentUser.role;
+                document.getElementById('currentUser').textContent = currentUser.username;
+                initializeApp();
+            } else {
+                alert('Tên đăng nhập hoặc mật khẩu không đúng!');
+            }
+        });
+        
+        document.getElementById('menuToggleBtn').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('sidebar-collapsed');
+            const mainContent = document.getElementById('mainContent');
+            mainContent.classList.toggle('lg:ml-0');
+            mainContent.classList.toggle('lg:ml-64');
+            window.dispatchEvent(new Event('resize'));
+        });
+        
+        window.addEventListener('click', (e) => {
+            if (!document.getElementById('notificationDropdownContainer')?.contains(e.target)) document.getElementById('notificationDropdown')?.classList.add('hidden');
+            if (!document.getElementById('userDropdownContainer')?.contains(e.target)) document.getElementById('userDropdown')?.classList.add('hidden');
+            document.querySelectorAll('.status-dropdown').forEach(d => {
+                if (!d.parentElement.contains(e.target)) d.classList.add('hidden');
+            });
+        });
+    });
+
+    function initializeApp() {
+        initializeSampleData();
+        renderAll();
+    }
+    
+    function renderAll() {
+        initializeDashboard();
+        populateDevicesTable();
+        populateMaintenanceTable();
+        populateIncidentsTable();
+        populateSchedulesTable();
+        populateLogsTable();
+        populateUsersTable();
+        populateMasterDataTable();
+        populatePermissionsTable();
+        updateDashboardStats();
+    }
+
+    function logout() { location.reload(); }
+
+    // #############################
+    // ### UI & RENDERING ###
+    // #############################
+    function showSection(sectionName, element) {
+        document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+        document.getElementById(sectionName + 'Section').classList.remove('hidden');
+        
+        document.getElementById('pageTitle').textContent = element.querySelector('span').textContent;
+        
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('bg-slate-700', 'text-white'));
+        element.classList.add('bg-slate-700', 'text-white');
+
+        // Update header actions
+        const config = sectionConfig[sectionName] || { showActions: false };
+        const headerActions = document.getElementById('headerActions');
+        if (config.showActions) {
+            headerActions.classList.remove('hidden');
+            document.getElementById('headerSearchInput').placeholder = config.placeholder;
+            document.getElementById('headerAddButton').innerHTML = `<i class="fas fa-plus mr-2"></i> ${config.addButtonText}`;
+        } else {
+            headerActions.classList.add('hidden');
+        }
+    }
+
+    function toggleDropdown(dropdownId, event) {
+        event && event.stopPropagation();
+        document.getElementById(dropdownId).classList.toggle('hidden');
+    }
+    
+    function toggleStatusDropdown(element, event) {
+        event.stopPropagation();
+        element.nextElementSibling.classList.toggle('hidden');
+    }
+
+    let maintenanceChartInstance = null;
+    function initializeDashboard() {
+        // ... (Chart and recent tasks rendering code from previous version)
+    }
+
+    function updateDashboardStats() {
+        // ... (Stats update code from previous version)
+    }
+    
+    // --- Table Population Functions ---
+    function populateDevicesTable() {
+        const tbody = document.getElementById('devicesTableBody');
+        tbody.innerHTML = state.devices.map(d => `
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4"><div class="flex items-center space-x-3"><img src="${d.image}" alt="${d.name}" class="device-image-sm"><div><p class="font-semibold text-slate-800">${d.id}</p><p class="text-xs text-slate-500">${d.name}</p></div></div></td>
+                <td class="px-6 py-4 capitalize">${d.type}</td><td class="px-6 py-4">${d.location}</td>
+                <td class="px-6 py-4">${renderStatusDropdown('devices', d.id, d.status)}</td>
+                <td class="px-6 py-4">${d.lastMaintenance}</td>
+                <td class="px-6 py-4 text-center">${renderActionButtons('devices', d.id)}</td>
+            </tr>`).join('');
+    }
+    
+    function populateMaintenanceTable() {
+        const tbody = document.getElementById('maintenanceTableBody');
+        tbody.innerHTML = state.maintenanceTasks.map(task => {
+            const device = state.devices.find(d => d.id === task.deviceId) || {};
+            return `
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4 font-semibold text-slate-800">${task.id}</td>
+                <td class="px-6 py-4"><div class="flex items-center space-x-3"><img src="${device.image}" alt="${device.name}" class="device-image-sm"><div><p class="font-semibold text-slate-800">${device.id}</p></div></div></td>
+                <td class="px-6 py-4">${task.type}</td><td class="px-6 py-4">${task.scheduledDate}</td><td class="px-6 py-4">${task.technician}</td>
+                <td class="px-6 py-4">${renderStatusDropdown('maintenanceTasks', task.id, task.status, ['scheduled', 'in_progress', 'completed'])}</td>
+                <td class="px-6 py-4 text-center">${renderActionButtons('maintenanceTasks', task.id)}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function populateIncidentsTable() {
+        // ... (Similar to populateMaintenanceTable)
+    }
+
+    function populateSchedulesTable() {
+        const tbody = document.getElementById('schedulesTableBody');
+        tbody.innerHTML = state.schedules.map(s => `
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4 font-semibold text-slate-800">${s.id}</td><td class="px-6 py-4">${s.name}</td>
+                <td class="px-6 py-4">${s.frequency}</td><td class="px-6 py-4">${s.nextRun}</td>
+                <td class="px-6 py-4">${renderStatusDropdown('schedules', s.id, s.status, ['active', 'inactive'])}</td>
+                <td class="px-6 py-4 text-center">${renderActionButtons('schedules', s.id)}</td>
+            </tr>`).join('');
+    }
+
+    function populateLogsTable() {
+        const tbody = document.getElementById('logsTableBody');
+        tbody.innerHTML = state.logs.map(l => `
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4 font-semibold text-slate-800">${l.id}</td><td class="px-6 py-4">${l.action}</td>
+                <td class="px-6 py-4">${l.user}</td><td class="px-6 py-4">${l.time}</td><td class="px-6 py-4 text-slate-500">${l.details}</td>
+                <td class="px-6 py-4 text-center"><button class="text-blue-600 hover:text-blue-800" title="Xem Chi tiết"><i class="fas fa-eye"></i></button></td>
+            </tr>`).join('');
+    }
+
+    function populateUsersTable() {
+        const tbody = document.getElementById('usersTableBody');
+        tbody.innerHTML = state.users.map(u => `
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4"><div class="flex items-center space-x-3"><img src="${u.avatar}" alt="${u.name}" class="device-image-sm rounded-full"><div><p class="font-semibold text-slate-800">${u.name}</p><p class="text-xs text-slate-500">${u.email}</p></div></div></td>
+                <td class="px-6 py-4">${u.role}</td><td class="px-6 py-4">${u.joined}</td>
+                <td class="px-6 py-4">${renderStatusDropdown('users', u.id, u.status, ['active', 'inactive'])}</td>
+                <td class="px-6 py-4 text-center">${renderActionButtons('users', u.id)}</td>
+            </tr>`).join('');
+    }
+
+    function populateMasterDataTable() {
+        const tbody = document.getElementById('masterDataTableBody');
+        tbody.innerHTML = state.masterData.map(m => `
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4">${m.type}</td><td class="px-6 py-4 font-mono text-xs">${m.code}</td><td class="px-6 py-4 font-semibold text-slate-800">${m.name}</td>
+                <td class="px-6 py-4">${renderStatusDropdown('masterData', m.id, m.status, ['active', 'inactive'])}</td>
+                <td class="px-6 py-4 text-center">${renderActionButtons('masterData', m.id)}</td>
+            </tr>`).join('');
+    }
+    
+    function populatePermissionsTable() {
+        const tbody = document.getElementById('permissionsTableBody');
+        tbody.innerHTML = state.permissions.map((p, index) => `
+            <tr class="hover:bg-slate-50">
+                <td class="px-6 py-4 font-semibold text-slate-800">${p.role}</td><td class="px-6 py-4">${p.module}</td>
+                ${['view', 'add', 'edit', 'delete'].map(action => `<td class="px-6 py-4 text-center"><input type="checkbox" ${p[action] ? 'checked' : ''} class="form-checkbox h-5 w-5 text-blue-600 rounded"></td>`).join('')}
+                <td class="px-6 py-4 text-center"><button class="text-blue-600 hover:text-blue-800" title="Lưu"><i class="fas fa-save"></i></button></td>
+            </tr>`).join('');
+    }
+
+    // --- Component Rendering Functions ---
+    function renderActionButtons(itemType, itemId) {
+        return `
+            <div class="flex items-center justify-center space-x-4">
+                <button onclick="editItem('${itemType}', '${itemId}')" class="text-blue-600 hover:text-blue-800" title="Chỉnh sửa"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteItem('${itemType}', '${itemId}')" class="text-red-500 hover:text-red-700" title="Xóa"><i class="fas fa-trash"></i></button>
+            </div>`;
+    }
+    
+    function renderStatusDropdown(itemType, itemId, currentStatus, availableStatuses = ['active', 'maintenance', 'broken']) {
+        return `
+            <div class="relative">
+                <button onclick="toggleStatusDropdown(this, event)" class="text-xs font-semibold px-2 py-1 rounded-full w-28 text-center ${statusConfig[currentStatus].color}">
+                    ${statusConfig[currentStatus].text} <i class="fas fa-chevron-down ml-1"></i>
+                </button>
+                <div class="status-dropdown hidden absolute z-10 mt-1 w-32 bg-white rounded-md shadow-lg border">
+                    ${availableStatuses.map(status => `
+                        <a href="#" onclick="updateStatus('${itemType}', '${itemId}', '${status}', event)" class="block px-3 py-2 text-sm hover:bg-slate-100">${statusConfig[status].text}</a>
+                    `).join('')}
+                </div>
+            </div>`;
+    }
+
+    // #############################
+    // ### ACTIONS & MODALS ###
+    // #############################
+    function editItem(itemType, itemId) {
+        if (itemType === 'devices') {
+            // Existing logic for editing device
+            const device = state.devices.find(d => d.id === itemId);
+            // ... show modal with device data ...
+            alert(`Đang sửa ${itemType}: ${itemId}`);
+        } else {
+            alert(`Đang sửa ${itemType}: ${itemId}`);
+        }
+    }
+
+    function deleteItem(itemType, itemId) {
+        if (confirm(`Bạn có chắc chắn muốn xóa mục này: ${itemId}?`)) {
+            const itemIndex = state[itemType].findIndex(item => item.id === itemId);
+            if (itemIndex > -1) {
+                state[itemType].splice(itemIndex, 1);
+                // Dynamically call the correct populate function to refresh the view
+                const populateFnName = `populate${itemType.charAt(0).toUpperCase() + itemType.slice(1)}Table`;
+                if (window[populateFnName]) {
+                    window[populateFnName]();
+                }
+                 updateDashboardStats(); // Recalculate stats if needed
+            }
+        }
+    }
+    
+    function updateStatus(itemType, itemId, newStatus, event) {
+        event.preventDefault();
+        const item = state[itemType].find(i => i.id === itemId);
+        if (item) {
+            item.status = newStatus;
+            const populateFnName = `populate${itemType.charAt(0).toUpperCase() + itemType.slice(1)}Table`;
+            if (window[populateFnName]) {
+                window[populateFnName]();
+            }
+             updateDashboardStats(); // Recalculate stats if needed
+        }
+    }
+    </script>
+</body>
+</html>
